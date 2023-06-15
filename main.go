@@ -17,7 +17,6 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	ps "github.com/mitchellh/go-ps"
 )
@@ -59,6 +58,18 @@ var testchainLinuxQtBytes []byte
 //go:embed binaries/testchain-qt-windows.exe
 var testchainWindowsQtBytes []byte
 
+//go:embed images/mine.svg
+var mineIconBytes []byte
+var mineIcon fyne.Resource
+
+// //go:embed images/start.svg
+// var startIconBytes []byte
+// var startIcon fyne.Resource
+
+//go:embed images/stop.png
+var stopIconBytes []byte
+var stopIcon fyne.Resource
+
 //go:embed data/chain_data.json
 var chainDataBytes []byte
 
@@ -79,6 +90,10 @@ func main() {
 	w.Resize(baseSize)
 
 	dirSetup()
+
+	mineIcon = fyne.NewStaticResource("mine.svg", mineIconBytes)
+	//startIcon = fyne.NewStaticResource("start.svg", startIconBytes)
+	stopIcon = fyne.NewStaticResource("stop.png", stopIconBytes)
 
 	// UI Setup
 	// Create the left menu
@@ -331,84 +346,105 @@ func cleanup() {
 	quitChainStateUpdate <- struct{}{}
 }
 
+func getCardButton(label string, disabled bool, tapped func()) *widget.Button {
+	b := widget.NewButton(label, tapped)
+	if disabled {
+		b.Disable()
+	}
+	return b
+}
+
+func overViewChainCard(chainData ChainData, state *ChainState, mainChainState *ChainState) *widget.Card {
+
+	chainIndex := getChainDataIndexByID(chainData.ID)
+	st := widget.NewLabel(chainData.Description)
+	st.Wrapping = fyne.TextWrapWord
+
+	var launchButton *widget.Button
+	cardContainer := container.NewVBox(st, layout.NewSpacer())
+
+	if chainData.ID == "drivechain" {
+
+		if mainChainState.ID == "" {
+			launchButton = getCardButton("Launch", false, func() {
+				launchChain(1)
+			})
+			launchButton.Importance = widget.HighImportance
+			cardContainer.Add(launchButton)
+		} else if mainChainState.ID != "" && mainChainState.State == Waiting {
+			launchButton = getCardButton("Starting...", true, func() {})
+			cardContainer.Add(launchButton)
+		} else if mainChainState.ID != "" && mainChainState.State == Running {
+			launchButton = getCardButton("Stop", false, func() {
+				stopChain(1)
+			})
+			mineButton := widget.NewButton("Mine", func() {
+			})
+			mineButton.Importance = widget.HighImportance
+			cardContainer.Add(container.NewVBox(launchButton, mineButton))
+		}
+
+	} else {
+
+		if state.ID == "" && mainChainState.ID != "" && mainChainState.State == Running {
+			launchButton = getCardButton("Launch", false, func() {
+				launchChain(chainIndex)
+			})
+			launchButton.Importance = widget.HighImportance
+			cardContainer.Add(launchButton)
+		} else if state.ID != "" && state.State == Waiting {
+			launchButton = getCardButton("Starting...", true, func() {})
+			cardContainer.Add(launchButton)
+		} else if state.ID != "" && state.State == Running {
+			launchButton = getCardButton("Stop", false, func() {
+				stopChain(chainIndex)
+			})
+			cardContainer.Add(launchButton)
+		} else {
+			launchButton = getCardButton("Launch", true, func() {})
+			launchButton.Importance = widget.HighImportance
+			cardContainer.Add(launchButton)
+		}
+
+	}
+
+	return widget.NewCard(chainData.Name, "", cardContainer)
+}
+
 func setMainContentUI(chainDataIndex int) {
+	mainChain := chainData[1]
 	chain := chainData[chainDataIndex]
+
 	content.Objects = nil
+
+	//chainStateMutex.RLock()
+	mainChainState := chainState[mainChain.ID]
+	//chainStateMutex.RUnlock()
 
 	if chain.ID == "overview" {
 
-		mainChain := chainData[1]
-
-		subTitle := widget.NewLabel(mainChain.Description)
-		subTitle.Wrapping = fyne.TextWrapWord
-
-		//chainStateMutex.RLock()
-		mainChainState, mainChainStateOk := chainState[mainChain.ID]
-		//chainStateMutex.RUnlock()
-
-		var launchButton *widget.Button
-		if !mainChainStateOk {
-			launchButton = widget.NewButton("Launch", func() {
-				launchChain(1)
-			})
-			launchButton.SetIcon(theme.MediaPlayIcon())
-		} else if mainChainStateOk && mainChainState.State == Waiting {
-			launchButton = widget.NewButton("Starting...", func() {
-
-			})
-			launchButton.Disable()
-		} else if mainChainStateOk && mainChainState.State == Running {
-			launchButton = widget.NewButton("Stop", func() {
-				stopChain(1)
-			})
-			launchButton.SetIcon(theme.MediaStopIcon())
-		}
-
+		// Top area for main chain
 		vbox := container.NewVBox()
-		vbox.Add(widget.NewCard(mainChain.Name, "", container.NewVBox(subTitle, layout.NewSpacer(), launchButton)))
+		vbox.Add(overViewChainCard(mainChain, &mainChainState, &mainChainState))
 
+		// Bottom area for sidechains
 		grid := container.NewGridWithColumns(2)
 		vbox.Add(grid)
 
 		for i, chain := range chainData {
 			if i > 1 {
-
-				subTile := widget.NewLabel(chain.Description)
-				subTile.Wrapping = fyne.TextWrapWord
-				var launchButton *widget.Button
-				chainIndex := i
-				state, ok := chainState[chain.ID]
-
-				if !ok && mainChainStateOk && mainChainState.State == Running {
-					launchButton = widget.NewButton("Launch", func() {
-						launchChain(chainIndex)
-					})
-					launchButton.SetIcon(theme.MediaPlayIcon())
-				} else if ok && state.State == Waiting {
-					launchButton = widget.NewButton("Starting...", func() {})
-					launchButton.Disable()
-				} else if ok && state.State == Running {
-					launchButton = widget.NewButton("Stop", func() {
-						stopChain(chainIndex)
-					})
-					launchButton.SetIcon(theme.MediaStopIcon())
-				} else {
-					launchButton = widget.NewButton("Launch", func() {
-					})
-					launchButton.SetIcon(theme.MediaPlayIcon())
-					launchButton.Disable()
-				}
-
-				grid.Add(widget.NewCard(chain.Name, "", container.NewVBox(subTile, layout.NewSpacer(), launchButton)))
+				state := chainState[chain.ID]
+				grid.Add(overViewChainCard(chain, &state, &mainChainState))
 			}
 		}
-		content.Add(vbox)
+
+		content.Add(container.NewPadded(vbox))
 
 	} else {
 		subTitle := widget.NewLabel(chain.Description)
 		subTitle.Wrapping = fyne.TextWrapWord
 		launchButton := widget.NewButton("Launch", func() {})
-		content.Add(widget.NewCard(chain.Name, "", container.NewVBox(subTitle, layout.NewSpacer(), launchButton)))
+		content.Add(container.NewPadded(widget.NewCard(chain.Name, "", container.NewVBox(subTitle, layout.NewSpacer(), launchButton))))
 	}
 
 	content.Refresh()
