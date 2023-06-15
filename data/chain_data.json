@@ -1,0 +1,41 @@
+[
+    {
+        "id": "overview",
+        "name": "OverView",
+        "description": "Overview of all chains",
+        "regtest": true,
+        "port": "",
+        "rpc_user": "",
+        "rpc_password": ""
+    },
+    {
+        "id": "drivechain",
+        "name": "MainChain",
+        "description": "Bitcoin Core + Bips 300/301",
+        "regtest": true,
+        "bin": "drivechain-qt",
+        "port": "18443",
+        "rpc_user": "user",
+        "rpc_password": "password"
+    },
+    {
+        "id": "bitassets",
+        "name": "BitAssets",
+        "description": "A sidechain for issuing Bit-Art (NFTs) and digital assets (ICOs, tokens)",
+        "regtest": true,
+        "bin": "bitassets-qt",
+        "port": "19004",
+        "rpc_user": "user",
+        "rpc_password": "password"
+    },
+    {
+        "id": "testchain",
+        "name": "TestChain",
+        "description": "A blank sidechain, based on Bitcoin Core 16.99",
+        "regtest": true,
+        "bin": "testchain-qt",
+        "port": "19005",
+        "rpc_user": "user",
+        "rpc_password": "password"
+    }
+]
