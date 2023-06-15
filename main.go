@@ -79,8 +79,6 @@ var quitChainStateUpdate chan struct{}
 var chainData = make([]ChainData, 0)
 var chainState = make(map[string]ChainState, 0)
 
-//var chainStateMutex = &sync.RWMutex{}
-
 var selectedChainDataIndex int = 0
 var switchboardDir string
 
@@ -232,9 +230,7 @@ func launchChain(chainDataIndex int) {
 		log.Fatal(err)
 	}
 
-	//chainStateMutex.Lock()
 	chainState[chain.ID] = ChainState{ID: chain.ID, State: Waiting, CMD: cmd}
-	//chainStateMutex.Unlock()
 
 	setMainContentUI(selectedChainDataIndex)
 }
@@ -247,9 +243,7 @@ func stopChain(chainDataIndex int) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		//chainStateMutex.Lock()
 		delete(chainState, chain.ID)
-		//chainStateMutex.Unlock()
 		setMainContentUI(selectedChainDataIndex)
 	}
 }
@@ -285,7 +279,6 @@ func startChainStateUpdate() {
 			select {
 			case <-chainStateUpdate.C:
 				// call RPC method getblockcount to check if chain is running
-				//chainStateMutex.Lock()
 				for k, state := range chainState {
 					// This is used to handle case where user stops chain from outside of switchboard
 					if !isProcessRunning(state.CMD) {
@@ -312,7 +305,6 @@ func startChainStateUpdate() {
 						}
 					}
 				}
-				//chainStateMutex.Unlock()
 			case <-quitChainStateUpdate:
 				chainStateUpdate.Stop()
 				return
@@ -346,7 +338,7 @@ func cleanup() {
 	quitChainStateUpdate <- struct{}{}
 }
 
-func getCardButton(label string, disabled bool, tapped func()) *widget.Button {
+func cardButton(label string, disabled bool, tapped func()) *widget.Button {
 	b := widget.NewButton(label, tapped)
 	if disabled {
 		b.Disable()
@@ -354,7 +346,7 @@ func getCardButton(label string, disabled bool, tapped func()) *widget.Button {
 	return b
 }
 
-func overViewChainCard(chainData ChainData, state *ChainState, mainChainState *ChainState) *widget.Card {
+func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainState) *widget.Card {
 
 	chainIndex := getChainDataIndexByID(chainData.ID)
 	st := widget.NewLabel(chainData.Description)
@@ -366,16 +358,16 @@ func overViewChainCard(chainData ChainData, state *ChainState, mainChainState *C
 	if chainData.ID == "drivechain" {
 
 		if mainChainState.ID == "" {
-			launchButton = getCardButton("Launch", false, func() {
+			launchButton = cardButton("Launch", false, func() {
 				launchChain(1)
 			})
 			launchButton.Importance = widget.HighImportance
 			cardContainer.Add(launchButton)
 		} else if mainChainState.ID != "" && mainChainState.State == Waiting {
-			launchButton = getCardButton("Starting...", true, func() {})
+			launchButton = cardButton("Starting...", true, func() {})
 			cardContainer.Add(launchButton)
 		} else if mainChainState.ID != "" && mainChainState.State == Running {
-			launchButton = getCardButton("Stop", false, func() {
+			launchButton = cardButton("Stop", false, func() {
 				stopChain(1)
 			})
 			mineButton := widget.NewButton("Mine", func() {
@@ -387,21 +379,21 @@ func overViewChainCard(chainData ChainData, state *ChainState, mainChainState *C
 	} else {
 
 		if state.ID == "" && mainChainState.ID != "" && mainChainState.State == Running {
-			launchButton = getCardButton("Launch", false, func() {
+			launchButton = cardButton("Launch", false, func() {
 				launchChain(chainIndex)
 			})
 			launchButton.Importance = widget.HighImportance
 			cardContainer.Add(launchButton)
 		} else if state.ID != "" && state.State == Waiting {
-			launchButton = getCardButton("Starting...", true, func() {})
+			launchButton = cardButton("Starting...", true, func() {})
 			cardContainer.Add(launchButton)
 		} else if state.ID != "" && state.State == Running {
-			launchButton = getCardButton("Stop", false, func() {
+			launchButton = cardButton("Stop", false, func() {
 				stopChain(chainIndex)
 			})
 			cardContainer.Add(launchButton)
 		} else {
-			launchButton = getCardButton("Launch", true, func() {})
+			launchButton = cardButton("Launch", true, func() {})
 			launchButton.Importance = widget.HighImportance
 			cardContainer.Add(launchButton)
 		}
@@ -417,15 +409,13 @@ func setMainContentUI(chainDataIndex int) {
 
 	content.Objects = nil
 
-	//chainStateMutex.RLock()
 	mainChainState := chainState[mainChain.ID]
-	//chainStateMutex.RUnlock()
 
 	if chain.ID == "overview" {
 
 		// Top area for main chain
 		vbox := container.NewVBox()
-		vbox.Add(overViewChainCard(mainChain, &mainChainState, &mainChainState))
+		vbox.Add(chainCard(mainChain, &mainChainState, &mainChainState))
 
 		// Bottom area for sidechains
 		grid := container.NewGridWithColumns(2)
@@ -434,17 +424,17 @@ func setMainContentUI(chainDataIndex int) {
 		for i, chain := range chainData {
 			if i > 1 {
 				state := chainState[chain.ID]
-				grid.Add(overViewChainCard(chain, &state, &mainChainState))
+				grid.Add(chainCard(chain, &state, &mainChainState))
 			}
 		}
 
 		content.Add(container.NewPadded(vbox))
 
 	} else {
-		subTitle := widget.NewLabel(chain.Description)
-		subTitle.Wrapping = fyne.TextWrapWord
-		launchButton := widget.NewButton("Launch", func() {})
-		content.Add(container.NewPadded(widget.NewCard(chain.Name, "", container.NewVBox(subTitle, layout.NewSpacer(), launchButton))))
+		state := chainState[chain.ID]
+		vbox := container.NewVBox()
+		vbox.Add(chainCard(chain, &state, &mainChainState))
+		content.Add(container.NewPadded(vbox))
 	}
 
 	content.Refresh()
