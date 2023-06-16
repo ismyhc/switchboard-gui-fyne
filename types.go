@@ -11,6 +11,8 @@ type ChainData struct {
 	Port        string `json:"port"`
 	RPCUser     string `json:"rpc_user"`
 	RPCPass     string `json:"rpc_password"`
+	Slot        int    `json:"slot"`
+	Version     string `json:"version"`
 }
 
 type ChainState struct {
@@ -21,10 +23,14 @@ type ChainState struct {
 }
 
 type RPCRequest struct {
-	JSONRpc string   `json:"jsonrpc"`
-	ID      string   `json:"id"`
-	Method  string   `json:"method"`
-	Params  []string `json:"params"`
+	JSONRpc string        `json:"jsonrpc"`
+	ID      string        `json:"id"`
+	Method  string        `json:"method"`
+	Params  []interface{} `json:"params"`
+}
+
+type RPCGetBlockCountResponse struct {
+	Result int `json:"result"`
 }
 
 type State uint

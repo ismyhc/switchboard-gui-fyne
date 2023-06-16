@@ -15,8 +15,9 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	ps "github.com/mitchellh/go-ps"
 )
@@ -221,7 +222,7 @@ func launchChain(chainDataIndex int) {
 		log.Fatal(err)
 	}
 
-	chainState[chain.ID] = ChainState{ID: chain.ID, State: Waiting, RefreshBMM: false, CMD: cmd}
+	chainState[chain.ID] = ChainState{ID: chain.ID, State: Waiting, RefreshBMM: true, CMD: cmd}
 
 	setMainContentUI(selectedChainDataIndex)
 }
@@ -247,7 +248,14 @@ func stopChain(chainDataIndex int) {
 	}
 }
 
-func makeRpcRequest(chainDataIndex int, method string, params []string) (*http.Response, error) {
+func mainChainMine() {
+	_, err := makeRpcRequest(1, "generate", []interface{}{1})
+	if err != nil {
+		println(err.Error())
+	}
+}
+
+func makeRpcRequest(chainDataIndex int, method string, params []interface{}) (*http.Response, error) {
 	if chainDataIndex > len(chainData) {
 		return nil, errors.New("invalid chainDataIndex")
 	}
@@ -284,7 +292,7 @@ func startChainStateUpdate() {
 						delete(chainState, k)
 						setMainContentUI(selectedChainDataIndex)
 					} else {
-						resp, err := makeRpcRequest(getChainDataIndexByID(k), "getblockcount", []string{})
+						resp, err := makeRpcRequest(getChainDataIndexByID(k), "getblockcount", []interface{}{})
 						if err != nil {
 							if state.State == Running {
 								state.State = Waiting
@@ -292,14 +300,38 @@ func startChainStateUpdate() {
 								setMainContentUI(selectedChainDataIndex)
 							}
 						} else {
-
 							defer resp.Body.Close()
 							if resp.StatusCode == 200 {
+
+								if state.ID == "drivechain" {
+									var res RPCGetBlockCountResponse
+									err := json.NewDecoder(resp.Body).Decode(&res)
+									if err == nil {
+										if res.Result < 200 {
+											// loop chain data
+											for _, chain := range chainData {
+												if chain.ID != "drivechain" && chain.ID != "overview" {
+													_, err := makeRpcRequest(getChainDataIndexByID(state.ID), "createsidechainproposal", []interface{}{chain.Slot, chain.ID})
+													if err != nil {
+														println(err.Error())
+													}
+												}
+											}
+											_, _ = makeRpcRequest(getChainDataIndexByID(k), "generate", []interface{}{200})
+										}
+									}
+								}
+
+								if state.ID != "drivechain" && state.RefreshBMM {
+									_, _ = makeRpcRequest(getChainDataIndexByID(k), "refreshbmm", []interface{}{0.001})
+								}
+
 								if state.State == Waiting || state.State == Unknown {
 									state.State = Running
 									chainState[k] = state
 									setMainContentUI(selectedChainDataIndex)
 								}
+
 							}
 						}
 					}
@@ -351,8 +383,13 @@ func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainStat
 	st := widget.NewLabel(chainData.Description)
 	st.Wrapping = fyne.TextWrapWord
 
+	vers := canvas.NewText("  Version: "+chainData.Version, theme.ForegroundColor())
+	vers.TextSize = theme.CaptionTextSize()
+	vers.TextStyle = fyne.TextStyle{Italic: true, Bold: true}
+	vers.Alignment = fyne.TextAlignLeading
+
 	var launchButton *widget.Button
-	cardContainer := container.NewVBox(st, layout.NewSpacer())
+	cardContainer := container.NewVBox(st, container.NewPadded(vers))
 
 	if chainData.ID == "drivechain" {
 
@@ -372,6 +409,7 @@ func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainStat
 			})
 			launchButton.SetIcon(t.Icon(StopIcon))
 			mineButton := widget.NewButton(" Mine", func() {
+				mainChainMine()
 			})
 			mineButton.SetIcon(t.Icon(MineIcon))
 			mineButton.Importance = widget.HighImportance
@@ -386,6 +424,8 @@ func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainStat
 		cardContainer.Add(refreshCheck)
 
 		if state.ID == "" && mainChainState.ID != "" && mainChainState.State == Running {
+			refreshCheck.Checked = true
+			refreshCheck.Refresh()
 			refreshCheck.Disable()
 			launchButton = cardButton(" Launch", false, func() {
 				launchChain(chainIndex)
@@ -394,16 +434,22 @@ func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainStat
 			launchButton.Importance = widget.HighImportance
 			cardContainer.Add(launchButton)
 		} else if state.ID != "" && state.State == Waiting {
+			refreshCheck.Checked = state.RefreshBMM
+			refreshCheck.Refresh()
 			refreshCheck.Disable()
 			launchButton = cardButton(" Starting...", true, func() {})
 			cardContainer.Add(launchButton)
 		} else if state.ID != "" && state.State == Running {
+			refreshCheck.Checked = state.RefreshBMM
+			refreshCheck.Refresh()
 			launchButton = cardButton(" Stop", false, func() {
 				stopChain(chainIndex)
 			})
 			launchButton.SetIcon(t.Icon(StopIcon))
 			cardContainer.Add(launchButton)
 		} else {
+			refreshCheck.Checked = true
+			refreshCheck.Refresh()
 			refreshCheck.Disable()
 			launchButton = cardButton(" Launch", true, func() {})
 			launchButton.SetIcon(t.Icon(StartIcon))
