@@ -28,6 +28,7 @@ var baseSize = fyne.Size{Width: 900, Height: 640}
 
 var a fyne.App
 var w fyne.Window
+var t switchboardTheme
 
 var content = container.NewVBox()
 
@@ -58,18 +59,6 @@ var testchainLinuxQtBytes []byte
 //go:embed binaries/testchain-qt-windows.exe
 var testchainWindowsQtBytes []byte
 
-//go:embed images/mine.svg
-var mineIconBytes []byte
-var mineIcon fyne.Resource
-
-// //go:embed images/start.svg
-// var startIconBytes []byte
-// var startIcon fyne.Resource
-
-//go:embed images/stop.png
-var stopIconBytes []byte
-var stopIcon fyne.Resource
-
 //go:embed data/chain_data.json
 var chainDataBytes []byte
 
@@ -83,15 +72,17 @@ var selectedChainDataIndex int = 0
 var switchboardDir string
 
 func main() {
+
 	a = app.NewWithID(APPID)
+
+	t = switchboardTheme{}
+	t.Init()
+
+	a.Settings().SetTheme((fyne.Theme)(&t))
 	w = a.NewWindow(APP_TITLE)
 	w.Resize(baseSize)
 
 	dirSetup()
-
-	mineIcon = fyne.NewStaticResource("mine.svg", mineIconBytes)
-	//startIcon = fyne.NewStaticResource("start.svg", startIconBytes)
-	stopIcon = fyne.NewStaticResource("stop.png", stopIconBytes)
 
 	// UI Setup
 	// Create the left menu
@@ -230,9 +221,17 @@ func launchChain(chainDataIndex int) {
 		log.Fatal(err)
 	}
 
-	chainState[chain.ID] = ChainState{ID: chain.ID, State: Waiting, CMD: cmd}
+	chainState[chain.ID] = ChainState{ID: chain.ID, State: Waiting, RefreshBMM: false, CMD: cmd}
 
 	setMainContentUI(selectedChainDataIndex)
+}
+
+func toggleRefreshBMM(chainID string) {
+	v, ok := chainState[chainID]
+	if ok {
+		v.RefreshBMM = !v.RefreshBMM
+		chainState[chainID] = v
+	}
 }
 
 func stopChain(chainDataIndex int) {
@@ -358,42 +357,56 @@ func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainStat
 	if chainData.ID == "drivechain" {
 
 		if mainChainState.ID == "" {
-			launchButton = cardButton("Launch", false, func() {
+			launchButton = cardButton(" Launch", false, func() {
 				launchChain(1)
 			})
+			launchButton.SetIcon(t.Icon(StartIcon))
 			launchButton.Importance = widget.HighImportance
 			cardContainer.Add(launchButton)
 		} else if mainChainState.ID != "" && mainChainState.State == Waiting {
-			launchButton = cardButton("Starting...", true, func() {})
+			launchButton = cardButton(" Starting...", true, func() {})
 			cardContainer.Add(launchButton)
 		} else if mainChainState.ID != "" && mainChainState.State == Running {
-			launchButton = cardButton("Stop", false, func() {
+			launchButton = cardButton(" Stop", false, func() {
 				stopChain(1)
 			})
-			mineButton := widget.NewButton("Mine", func() {
+			launchButton.SetIcon(t.Icon(StopIcon))
+			mineButton := widget.NewButton(" Mine", func() {
 			})
+			mineButton.SetIcon(t.Icon(MineIcon))
 			mineButton.Importance = widget.HighImportance
 			cardContainer.Add(container.NewVBox(launchButton, mineButton))
 		}
 
 	} else {
 
+		refreshCheck := widget.NewCheck("Mine", func(b bool) {
+			toggleRefreshBMM(chainData.ID)
+		})
+		cardContainer.Add(refreshCheck)
+
 		if state.ID == "" && mainChainState.ID != "" && mainChainState.State == Running {
-			launchButton = cardButton("Launch", false, func() {
+			refreshCheck.Disable()
+			launchButton = cardButton(" Launch", false, func() {
 				launchChain(chainIndex)
 			})
+			launchButton.SetIcon(t.Icon(StartIcon))
 			launchButton.Importance = widget.HighImportance
 			cardContainer.Add(launchButton)
 		} else if state.ID != "" && state.State == Waiting {
-			launchButton = cardButton("Starting...", true, func() {})
+			refreshCheck.Disable()
+			launchButton = cardButton(" Starting...", true, func() {})
 			cardContainer.Add(launchButton)
 		} else if state.ID != "" && state.State == Running {
-			launchButton = cardButton("Stop", false, func() {
+			launchButton = cardButton(" Stop", false, func() {
 				stopChain(chainIndex)
 			})
+			launchButton.SetIcon(t.Icon(StopIcon))
 			cardContainer.Add(launchButton)
 		} else {
-			launchButton = cardButton("Launch", true, func() {})
+			refreshCheck.Disable()
+			launchButton = cardButton(" Launch", true, func() {})
+			launchButton.SetIcon(t.Icon(StartIcon))
 			launchButton.Importance = widget.HighImportance
 			cardContainer.Add(launchButton)
 		}

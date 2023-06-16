@@ -1,0 +1,8 @@
+Website = "https://github.com/ismyhc/switchboard-gui-fyne"
+
+[Details]
+Icon = "AppIcon.png"
+Name = "DriveNet Switchboard"
+ID = "com.layertwolabs.switchboard"
+Version = "0.1.0"
+Build = 1

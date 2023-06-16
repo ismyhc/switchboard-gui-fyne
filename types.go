@@ -14,9 +14,10 @@ type ChainData struct {
 }
 
 type ChainState struct {
-	ID    string `json:"id"`
-	State State  `json:"state"`
-	CMD   *exec.Cmd
+	ID         string `json:"id"`
+	State      State  `json:"state"`
+	RefreshBMM bool   `json:"refresh_bmm"`
+	CMD        *exec.Cmd
 }
 
 type RPCRequest struct {
