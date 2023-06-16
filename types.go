@@ -33,6 +33,10 @@ type RPCGetBlockCountResponse struct {
 	Result int `json:"result"`
 }
 
+type RPCGetDepositAddressResponse struct {
+	Result string `json:"result"`
+}
+
 type State uint
 
 const (

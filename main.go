@@ -11,12 +11,14 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	ps "github.com/mitchellh/go-ps"
@@ -237,14 +239,32 @@ func toggleRefreshBMM(chainID string) {
 
 func stopChain(chainDataIndex int) {
 	chain := chainData[chainDataIndex]
-	v, ok := chainState[chain.ID]
+	_, ok := chainState[chain.ID]
 	if ok {
-		err := v.CMD.Process.Kill()
-		if err != nil {
-			log.Fatal(err)
-		}
+		_, _ = makeRpcRequest(chainDataIndex, "stop", []interface{}{})
 		delete(chainState, chain.ID)
 		setMainContentUI(selectedChainDataIndex)
+	}
+}
+
+func deposit(chainDataIndex int, amount float64) {
+	chain := chainData[chainDataIndex]
+	res, err := makeRpcRequest(getChainDataIndexByID(chain.ID), "getdepositaddress", []interface{}{})
+	if err != nil {
+		println(err.Error())
+		return
+	}
+	defer res.Body.Close()
+	if res.StatusCode == 200 {
+		var rpcRes RPCGetDepositAddressResponse
+		err := json.NewDecoder(res.Body).Decode(&rpcRes)
+		if err == nil {
+			address := rpcRes.Result
+			_, err := makeRpcRequest(1, "createsidechaindeposit", []interface{}{chain.Slot, address, amount, 0.001})
+			if err != nil {
+				println(err.Error())
+			}
+		}
 	}
 }
 
@@ -317,7 +337,7 @@ func startChainStateUpdate() {
 													}
 												}
 											}
-											_, _ = makeRpcRequest(getChainDataIndexByID(k), "generate", []interface{}{200})
+											_, _ = makeRpcRequest(getChainDataIndexByID(k), "generate", []interface{}{201})
 										}
 									}
 								}
@@ -389,7 +409,7 @@ func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainStat
 	vers.Alignment = fyne.TextAlignLeading
 
 	var launchButton *widget.Button
-	cardContainer := container.NewVBox(st, container.NewPadded(vers))
+	cardContainer := container.NewVBox(st, container.NewPadded(vers), layout.NewSpacer())
 
 	if chainData.ID == "drivechain" {
 
@@ -423,10 +443,44 @@ func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainStat
 		})
 		cardContainer.Add(refreshCheck)
 
+		depositEntry := widget.NewEntry()
+		depositEntry.SetPlaceHolder("")
+		depositEntry.Disable()
+
+		depositButton := widget.NewButtonWithIcon("Deposit", t.Icon(DepositIcon), func() {
+			value, err := strconv.ParseFloat(depositEntry.Text, 64)
+			if err != nil {
+				println(err.Error())
+			}
+			deposit(chainIndex, value)
+		})
+		depositButton.Disable()
+
+		depositBorder := container.NewBorder(nil, nil, nil, depositButton, depositEntry)
+
+		withdrawEntry := widget.NewEntry()
+		withdrawEntry.SetPlaceHolder("")
+		withdrawEntry.Disable()
+
+		withdrawButton := widget.NewButtonWithIcon("Withdraw", t.Icon(WithdrawIcon), func() {
+			// value, err := strconv.ParseFloat(depositEntry.Text, 64)
+			// if err != nil {
+			// 	println(err.Error())
+			// }
+			// deposit(chainIndex, value)
+		})
+		withdrawButton.Disable()
+
+		withdrawBorder := container.NewBorder(nil, nil, nil, withdrawButton, withdrawEntry)
+
+		cardContainer.Add(depositBorder)
+		cardContainer.Add(withdrawBorder)
+
 		if state.ID == "" && mainChainState.ID != "" && mainChainState.State == Running {
 			refreshCheck.Checked = true
 			refreshCheck.Refresh()
 			refreshCheck.Disable()
+
 			launchButton = cardButton(" Launch", false, func() {
 				launchChain(chainIndex)
 			})
@@ -442,6 +496,12 @@ func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainStat
 		} else if state.ID != "" && state.State == Running {
 			refreshCheck.Checked = state.RefreshBMM
 			refreshCheck.Refresh()
+
+			depositEntry.Enable()
+			depositButton.Enable()
+			withdrawEntry.Enable()
+			withdrawButton.Enable()
+
 			launchButton = cardButton(" Stop", false, func() {
 				stopChain(chainIndex)
 			})

@@ -20,10 +20,20 @@ var stopIconRes fyne.Resource
 var mineIconBytes []byte
 var mineIconRes fyne.Resource
 
+//go:embed images/deposit.svg
+var depositIconBytes []byte
+var depositIconRes fyne.Resource
+
+//go:embed images/withdraw.svg
+var withdrawIconBytes []byte
+var withdrawIconRes fyne.Resource
+
 const (
-	StartIcon fyne.ThemeIconName = "start.svg"
-	StopIcon  fyne.ThemeIconName = "stop.svg"
-	MineIcon  fyne.ThemeIconName = "mine.svg"
+	StartIcon    fyne.ThemeIconName = "start.svg"
+	StopIcon     fyne.ThemeIconName = "stop.svg"
+	MineIcon     fyne.ThemeIconName = "mine.svg"
+	DepositIcon  fyne.ThemeIconName = "deposit.svg"
+	WithdrawIcon fyne.ThemeIconName = "withdraw.svg"
 )
 
 type switchboardTheme struct{}
@@ -32,6 +42,8 @@ func (t switchboardTheme) Init() {
 	startIconRes = theme.NewThemedResource(fyne.NewStaticResource(string(StartIcon), startIconBytes))
 	stopIconRes = theme.NewThemedResource(fyne.NewStaticResource(string(StopIcon), stopIconBytes))
 	mineIconRes = theme.NewThemedResource(fyne.NewStaticResource(string(MineIcon), mineIconBytes))
+	depositIconRes = theme.NewThemedResource(fyne.NewStaticResource(string(DepositIcon), depositIconBytes))
+	withdrawIconRes = theme.NewThemedResource(fyne.NewStaticResource(string(WithdrawIcon), withdrawIconBytes))
 }
 
 func (t switchboardTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
@@ -53,6 +65,10 @@ func (t switchboardTheme) Icon(name fyne.ThemeIconName) fyne.Resource {
 		return stopIconRes
 	case MineIcon:
 		return mineIconRes
+	case DepositIcon:
+		return depositIconRes
+	case WithdrawIcon:
+		return withdrawIconRes
 	default:
 		return theme.DefaultTheme().Icon(name)
 	}
