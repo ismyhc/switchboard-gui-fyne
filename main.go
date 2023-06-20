@@ -182,10 +182,13 @@ func writeBinaries() {
 				switch chain.ID {
 				case "drivechain":
 					binBytes = drivechainWindowsQtBytes
+					binDir = binDir + ".exe"
 				case "bitassets":
 					binBytes = bitassetsWindowsQtBytes
+					binDir = binDir + ".exe"
 				case "testchain":
 					binBytes = testchainWindowsQtBytes
+					binDir = binDir + ".exe"
 				}
 			}
 			if len(binBytes) > 0 {
