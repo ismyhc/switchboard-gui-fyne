@@ -3,7 +3,7 @@ module switchboard-gui-fyne
 go 1.20
 
 require (
-	fyne.io/fyne/v2 v2.3.6-0.20230613150945-70185861eae0
+	fyne.io/fyne/v2 v2.3.6-0.20230620193502-28dc6f14f62e
 	github.com/mitchellh/go-ps v1.0.0
 )
 
