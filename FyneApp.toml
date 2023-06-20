@@ -5,4 +5,4 @@ Website = "https://github.com/ismyhc/switchboard-gui-fyne"
   Name = "DriveNet"
   ID = "com.layertwolabs.switchboard"
   Version = "0.1.0"
-  Build = 3
+  Build = 4

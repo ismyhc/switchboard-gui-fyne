@@ -24,16 +24,20 @@ import (
 	ps "github.com/mitchellh/go-ps"
 )
 
-const APPID = "com.layertwolabs.switchboard"
-const APP_TITLE = "DriveNet Switchboard"
+const (
+	APPID     = "com.layertwolabs.switchboard"
+	APP_TITLE = "DriveNet Switchboard"
+)
 
 var baseSize = fyne.Size{Width: 900, Height: 640}
 
-var a fyne.App
-var w fyne.Window
-var t switchboardTheme
+var (
+	a fyne.App
+	w fyne.Window
+	t switchboardTheme
+)
 
-var content = container.NewVBox()
+var content = container.NewStack()
 
 //go:embed binaries/drivechain-qt-darwin
 var drivechainDarwinQtBytes []byte
@@ -65,17 +69,23 @@ var testchainWindowsQtBytes []byte
 //go:embed data/chain_data.json
 var chainDataBytes []byte
 
-var chainStateUpdate *time.Ticker
-var quitChainStateUpdate chan struct{}
+var (
+	chainStateUpdate     *time.Ticker
+	quitChainStateUpdate chan struct{}
+)
 
-var chainData = make([]ChainData, 0)
-var chainState = make(map[string]ChainState, 0)
+var (
+	chainData  = make([]ChainData, 0)
+	chainState = make(map[string]ChainState, 0)
+)
 
-var selectedChainDataIndex int = 0
-var switchboardDir string
+var (
+	selectedChainDataIndex int = 0
+	switchboardDir         string
+	dirSeperator           string
+)
 
 func main() {
-
 	a = app.NewWithID(APPID)
 
 	t = switchboardTheme{}
@@ -134,11 +144,11 @@ func dirSetup() {
 		log.Fatal(err)
 	}
 
-	if _, err := os.Stat(homeDir + "/.switchboard3"); os.IsNotExist(err) {
-		os.Mkdir(homeDir+"/.switchboard3", 0755)
-	}
+	switchboardDir = homeDir + string(os.PathSeparator) + ".switchboard3"
 
-	switchboardDir = homeDir + "/.switchboard3"
+	if _, err := os.Stat(switchboardDir); os.IsNotExist(err) {
+		os.Mkdir(switchboardDir, 0o755)
+	}
 
 	writeBinaries()
 }
@@ -146,61 +156,42 @@ func dirSetup() {
 func writeBinaries() {
 	for i, chain := range chainData {
 		if i > 0 {
+			var binBytes []byte
+			binDir := switchboardDir + string(os.PathSeparator) + chain.Bin
 			target := runtime.GOOS
 			switch target {
 			case "darwin":
 				switch chain.ID {
 				case "drivechain":
-					err := os.WriteFile(switchboardDir+"/"+chain.Bin, drivechainDarwinQtBytes, 0755)
-					if err != nil {
-						log.Fatal(err)
-					}
+					binBytes = drivechainDarwinQtBytes
 				case "bitassets":
-					err := os.WriteFile(switchboardDir+"/"+chain.Bin, bitassetsDarwinQtBytes, 0755)
-					if err != nil {
-						log.Fatal(err)
-					}
+					binBytes = bitassetsDarwinQtBytes
 				case "testchain":
-					err := os.WriteFile(switchboardDir+"/"+chain.Bin, testchainDarwinQtBytes, 0755)
-					if err != nil {
-						log.Fatal(err)
-					}
+					binBytes = testchainDarwinQtBytes
 				}
 			case "linux":
 				switch chain.ID {
 				case "drivechain":
-					err := os.WriteFile(switchboardDir+"/"+chain.Bin, drivechainLinuxQtBytes, 0755)
-					if err != nil {
-						log.Fatal(err)
-					}
+					binBytes = drivechainLinuxQtBytes
 				case "bitassets":
-					err := os.WriteFile(switchboardDir+"/"+chain.Bin, bitassetsLinuxQtBytes, 0755)
-					if err != nil {
-						log.Fatal(err)
-					}
+					binBytes = bitassetsLinuxQtBytes
 				case "testchain":
-					err := os.WriteFile(switchboardDir+"/"+chain.Bin, testchainLinuxQtBytes, 0755)
-					if err != nil {
-						log.Fatal(err)
-					}
+					binBytes = testchainLinuxQtBytes
 				}
 			case "windows":
 				switch chain.ID {
 				case "drivechain":
-					err := os.WriteFile(switchboardDir+"/"+chain.Bin, drivechainWindowsQtBytes, 0755)
-					if err != nil {
-						log.Fatal(err)
-					}
+					binBytes = drivechainWindowsQtBytes
 				case "bitassets":
-					err := os.WriteFile(switchboardDir+"/"+chain.Bin, bitassetsWindowsQtBytes, 0755)
-					if err != nil {
-						log.Fatal(err)
-					}
+					binBytes = bitassetsWindowsQtBytes
 				case "testchain":
-					err := os.WriteFile(switchboardDir+"/"+chain.Bin, testchainWindowsQtBytes, 0755)
-					if err != nil {
-						log.Fatal(err)
-					}
+					binBytes = testchainWindowsQtBytes
+				}
+			}
+			if len(binBytes) > 0 {
+				err := os.WriteFile(binDir, binBytes, 0o755)
+				if err != nil {
+					log.Fatal(err)
 				}
 			}
 		}
@@ -209,16 +200,16 @@ func writeBinaries() {
 
 func launchChain(chainDataIndex int) {
 	chain := chainData[chainDataIndex]
-	chainDataDir := switchboardDir + "/data/" + chain.ID
+	chainDataDir := switchboardDir + string(os.PathSeparator) + "data" + string(os.PathSeparator) + chain.ID
 	if _, err := os.Stat(chainDataDir); os.IsNotExist(err) {
-		os.MkdirAll(chainDataDir, 0755)
+		os.MkdirAll(chainDataDir, 0o755)
 	}
 	var regtest string = "0"
 	if chain.Regtest {
 		regtest = "1"
 	}
 	args := []string{"-regtest=" + regtest, "-datadir=" + chainDataDir, "-rpcport=" + chain.Port, "-rpcuser=" + chain.RPCUser, "-rpcpassword=" + chain.RPCPass, "-server=1"}
-	cmd := exec.Command(switchboardDir+"/"+chain.Bin, args...)
+	cmd := exec.Command(switchboardDir+string(os.PathSeparator)+chain.Bin, args...)
 	err := cmd.Start()
 	if err != nil {
 		log.Fatal(err)
@@ -398,7 +389,6 @@ func cardButton(label string, disabled bool, tapped func()) *widget.Button {
 }
 
 func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainState) *widget.Card {
-
 	chainIndex := getChainDataIndexByID(chainData.ID)
 	st := widget.NewLabel(chainData.Description)
 	st.Wrapping = fyne.TextWrapWord
@@ -412,7 +402,6 @@ func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainStat
 	cardContainer := container.NewVBox(st, container.NewPadded(vers), layout.NewSpacer())
 
 	if chainData.ID == "drivechain" {
-
 		if mainChainState.ID == "" {
 			launchButton = cardButton(" Launch", false, func() {
 				launchChain(1)
@@ -435,7 +424,6 @@ func chainCard(chainData ChainData, state *ChainState, mainChainState *ChainStat
 			mineButton.Importance = widget.HighImportance
 			cardContainer.Add(container.NewVBox(launchButton, mineButton))
 		}
-
 	} else {
 
 		refreshCheck := widget.NewCheck("Mine", func(b bool) {
@@ -547,7 +535,9 @@ func setMainContentUI(chainDataIndex int) {
 			}
 		}
 
-		content.Add(container.NewPadded(vbox))
+		scroll := container.NewScroll(container.NewPadded(vbox))
+
+		content.Add(scroll)
 
 	} else {
 		state := chainState[chain.ID]
