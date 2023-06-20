@@ -82,7 +82,6 @@ var (
 var (
 	selectedChainDataIndex int = 0
 	switchboardDir         string
-	dirSeperator           string
 )
 
 func main() {
